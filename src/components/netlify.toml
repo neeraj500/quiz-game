@@ -1,6 +1,6 @@
 [build]
   # The command to run the build (assumes you are using Create React App)
-  command = “CI= npm run build”
+  command = “npm run build”
   # The directory where the build output is located
   publish = "build"
 
