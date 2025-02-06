@@ -1,0 +1,11 @@
+[build]
+  # The command to run the build (assumes you are using Create React App)
+  command = “CI= npm run build”
+  # The directory where the build output is located
+  publish = "build"
+
+# Redirect all requests to index.html to support client-side routing
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200
