@@ -1,17 +1,16 @@
 // src/screens/QuestionScreen.js
-import { useContext, useState } from 'react';
+import React, { useContext, useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { QuestionContext } from '../contexts/QuestionContext';
-import { POINTS, PASS_THRESHOLD, LEVELS } from '../constants/gameConstants';
+import { PASS_THRESHOLD, LEVELS } from '../constants/gameConstants';
 
 const QUESTIONS_PER_LEVEL = 3; // Define how many questions to ask per level
 
 const QuestionScreen = () => {
   const navigate = useNavigate();
-  // Note: using shuffledQuestions from context
   const {
     level,
-    shuffledQuestions,
+    shuffledQuestions, // use shuffled questions from context
     questionIndex,
     correctCount,
     checkAnswer,
@@ -19,78 +18,94 @@ const QuestionScreen = () => {
     nextLevel,
   } = useContext(QuestionContext);
 
+  // Local state to hold the user's answer
+  const [userAnswer, setUserAnswer] = useState('');
+  // Local state for flash feedback ("Correct!", "Incorrect!", or "Time's up!")
+  const [feedback, setFeedback] = useState('');
+  // Local state for the timer (in seconds)
+  const [timer, setTimer] = useState(25);
+
+  // Reset timer whenever a new question is loaded (questionIndex changes)
+  useEffect(() => {
+    setTimer(25);
+    const interval = setInterval(() => {
+      setTimer(prev => {
+        if (prev <= 1) {
+          clearInterval(interval);
+          handleTimeout();
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+    return () => clearInterval(interval);
+  }, [questionIndex]);
+
   // If no questions are available for the current level, show a message.
   if (!shuffledQuestions || shuffledQuestions.length === 0) {
     return <div>No questions available for this level.</div>;
   }
 
-  // Get the current question based on the question index
+  // Get the current question based on the questionIndex from the shuffled array
   const currentQuestion = shuffledQuestions[questionIndex];
 
-  // Local state to hold the user's answer
-  const [userAnswer, setUserAnswer] = useState('');
-  // Local state for flash feedback ("Correct!" or "Incorrect!")
-  const [feedback, setFeedback] = useState('');
-
-  // Handle submission of the answer
-  const handleSubmit = (e) => {
-    e.preventDefault();
-    // Determine if the answer is correct
-    const isCorrect = checkAnswer(userAnswer, currentQuestion.correctAnswer);
-
-    setFeedback(isCorrect ? "Correct!" : "Incorrect!");
-
-    // Delay 1 second so feedback can be seen before moving on
+  // Function to handle submission when time runs out
+  const handleTimeout = () => {
+    // Only proceed if no answer has been submitted already
+    if (feedback) return;
+    setFeedback("Time's up!");
     setTimeout(() => {
-      submitAnswer(isCorrect);
-      // Clear the answer field and feedback for the next question
+      submitAnswer(false); // false means no points added
       setUserAnswer('');
       setFeedback('');
-
-      // If this was the last question in the level...
+      // Check level progression
       if (questionIndex + 1 >= QUESTIONS_PER_LEVEL) {
         const requiredCorrect = PASS_THRESHOLD[level] || 2;
-        // newCorrectCount is computed from the current correctCount plus the result of this answer.
-        const newCorrectCount = correctCount + (isCorrect ? 1 : 0);
-
-        // If no question was answered correctly in this level, force score to 0.
-        if (newCorrectCount === 0) {
-          // This ensures that the final score is 0 when no answers are correct.
-          // (This may be particularly relevant at the easy level.)
-          // Note: If score is cumulative across levels, you might choose to adjust this logic.
-          // For now, we reset it when no correct answers were given in the level.
-          // In our case, for an easy level failure, the score should be 0.
-          // If you want similar behavior for other levels, adjust accordingly.
-          // Here, we'll apply it to the easy level.
-          if (level === LEVELS.easy) {
-            // Resetting score explicitly
-            // (Assuming you have access to setScore in context; if not, you might need to add a function to do so.)
-            // Alternatively, you can incorporate this logic in your EndScreen.
-            // For simplicity, we'll assume that a failure in easy should show 0 points.
-            // If you're not resetting the score in context, you might consider modifying your EndScreen to check for correctCount.
-            // Here, we simulate that by overriding the score using context if available.
-            // (For example, if context provided a setScore method, you could call it here.)
-          }
-        }
-
-        // Check if user passed the level or failed
+        const newCorrectCount = correctCount; // no update as question was skipped
         if (newCorrectCount >= requiredCorrect) {
-          // If not on the last level, move to the next level
           if (level !== LEVELS.hard) {
             nextLevel();
-            navigate('/quiz'); // Refresh quiz screen with new level's questions
+            navigate('/quiz');
           } else {
-            // Completed hard level – game finished successfully
             navigate('/end');
           }
         } else {
-          // Player did not meet the threshold – game over, show end screen.
-          // Optionally, you can reset score here for easy level failure.
-          // For example, if (level === LEVELS.easy && newCorrectCount === 0) then force score to 0.
           navigate('/end');
         }
       }
-    }, 1000);
+    }, 800);
+  };
+
+  // Handle submission of the answer when user clicks the button
+  const handleSubmit = (e) => {
+    e.preventDefault();
+    // Clear the timer if the user submits in time
+    // Determine if the answer is correct
+    const isCorrect = checkAnswer(userAnswer, currentQuestion.correctAnswer);
+    setFeedback(isCorrect ? "Correct!" : "Incorrect!");
+
+    // Delay further actions by 0.8 sec so the feedback can be seen
+    setTimeout(() => {
+      submitAnswer(isCorrect);
+      setUserAnswer('');
+      setFeedback('');
+      // Check if this was the last question in the level
+      if (questionIndex + 1 >= QUESTIONS_PER_LEVEL) {
+        const requiredCorrect = PASS_THRESHOLD[level] || 2;
+        // Include the current answer result in the count
+        const newCorrectCount = correctCount + (isCorrect ? 1 : 0);
+        if (newCorrectCount >= requiredCorrect) {
+          if (level !== LEVELS.hard) {
+            nextLevel();
+            navigate('/quiz');
+          } else {
+            navigate('/end');
+          }
+        } else {
+          navigate('/end');
+        }
+      }
+    }, 800);
   };
 
   // Render the current question depending on its type
@@ -152,21 +167,22 @@ const QuestionScreen = () => {
 
   return (
     <div className="min-h-screen flex flex-col items-center justify-center bg-gray-50 p-4">
-      <div className="w-full max-w-md bg-white p-6 rounded shadow">
+      <div className="relative w-full max-w-md bg-white p-6 rounded shadow">
+        {/* Timer displayed at top right */}
+        <div className="absolute top-4 right-4 text-lg font-bold text-red-500">
+          {timer}s
+        </div>
         <h2 className="text-2xl font-bold mb-4 capitalize">{level} Level</h2>
         <div className="mb-4">
           {renderQuestion()}
         </div>
         <form onSubmit={handleSubmit}>
-          {feedback && <div className='mb-2 text-center font-semibold'>{feedback}</div>}
+          {/* Display flash feedback message above the submit button */}
+          {feedback && <div className="mb-2 text-center font-semibold">{feedback}</div>}
           <button 
             type="submit"
-            disabled={!userAnswer.trim() || feedback !== ''}
-            className={`w-full px-4 py-2 rounded transition text-white ${
-              (!userAnswer.trim() || feedback !== '')
-                ? 'bg-gray-400 cursor-not-allowed'
-                : 'bg-green-500 hover:bg-green-600'
-            }`}>
+            disabled={feedback !== ''}
+            className="w-full px-4 py-2 bg-green-500 text-white rounded hover:bg-green-600 transition disabled:opacity-50">
             Submit Answer
           </button>
         </form>
