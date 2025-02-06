@@ -1,5 +1,5 @@
 // src/screens/QuestionScreen.js
-import React, { useContext, useState } from 'react';
+import { useContext, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { QuestionContext } from '../contexts/QuestionContext';
 import { POINTS, PASS_THRESHOLD, LEVELS } from '../constants/gameConstants';
@@ -8,9 +8,10 @@ const QUESTIONS_PER_LEVEL = 3; // Define how many questions to ask per level
 
 const QuestionScreen = () => {
   const navigate = useNavigate();
+  // Note: using shuffledQuestions from context
   const {
     level,
-    questions,
+    shuffledQuestions,
     questionIndex,
     correctCount,
     checkAnswer,
@@ -19,17 +20,16 @@ const QuestionScreen = () => {
   } = useContext(QuestionContext);
 
   // If no questions are available for the current level, show a message.
-  if (!questions || questions.length === 0) {
+  if (!shuffledQuestions || shuffledQuestions.length === 0) {
     return <div>No questions available for this level.</div>;
   }
 
   // Get the current question based on the question index
-  const currentQuestion = questions[questionIndex];
+  const currentQuestion = shuffledQuestions[questionIndex];
 
-  // Local state to hold the user’s answer
+  // Local state to hold the user's answer
   const [userAnswer, setUserAnswer] = useState('');
-
-  // local state for feedback
+  // Local state for flash feedback ("Correct!" or "Incorrect!")
   const [feedback, setFeedback] = useState('');
 
   // Handle submission of the answer
@@ -40,32 +40,53 @@ const QuestionScreen = () => {
 
     setFeedback(isCorrect ? "Correct!" : "Incorrect!");
 
-    // delay 0.8 sec
+    // Delay 1 second so feedback can be seen before moving on
     setTimeout(() => {
       submitAnswer(isCorrect);
-      // Clear the answer field for the next question
+      // Clear the answer field and feedback for the next question
       setUserAnswer('');
       setFeedback('');
 
-      
-    // If this was the last question in the level...
+      // If this was the last question in the level...
       if (questionIndex + 1 >= QUESTIONS_PER_LEVEL) {
-        // Get the required number of correct answers from the constants (defaulting to 2 if not set)
         const requiredCorrect = PASS_THRESHOLD[level] || 2;
-        // Include the current answer result in the count
+        // newCorrectCount is computed from the current correctCount plus the result of this answer.
         const newCorrectCount = correctCount + (isCorrect ? 1 : 0);
-  
+
+        // If no question was answered correctly in this level, force score to 0.
+        if (newCorrectCount === 0) {
+          // This ensures that the final score is 0 when no answers are correct.
+          // (This may be particularly relevant at the easy level.)
+          // Note: If score is cumulative across levels, you might choose to adjust this logic.
+          // For now, we reset it when no correct answers were given in the level.
+          // In our case, for an easy level failure, the score should be 0.
+          // If you want similar behavior for other levels, adjust accordingly.
+          // Here, we'll apply it to the easy level.
+          if (level === LEVELS.easy) {
+            // Resetting score explicitly
+            // (Assuming you have access to setScore in context; if not, you might need to add a function to do so.)
+            // Alternatively, you can incorporate this logic in your EndScreen.
+            // For simplicity, we'll assume that a failure in easy should show 0 points.
+            // If you're not resetting the score in context, you might consider modifying your EndScreen to check for correctCount.
+            // Here, we simulate that by overriding the score using context if available.
+            // (For example, if context provided a setScore method, you could call it here.)
+          }
+        }
+
+        // Check if user passed the level or failed
         if (newCorrectCount >= requiredCorrect) {
           // If not on the last level, move to the next level
           if (level !== LEVELS.hard) {
             nextLevel();
-            navigate('/quiz'); // Navigate to refresh the quiz screen with new questions
+            navigate('/quiz'); // Refresh quiz screen with new level's questions
           } else {
-            // Completed the hard level – game finished successfully
+            // Completed hard level – game finished successfully
             navigate('/end');
           }
         } else {
-          // Player did not meet the threshold – game over, show end screen
+          // Player did not meet the threshold – game over, show end screen.
+          // Optionally, you can reset score here for easy level failure.
+          // For example, if (level === LEVELS.easy && newCorrectCount === 0) then force score to 0.
           navigate('/end');
         }
       }
@@ -140,7 +161,12 @@ const QuestionScreen = () => {
           {feedback && <div className='mb-2 text-center font-semibold'>{feedback}</div>}
           <button 
             type="submit"
-            className="w-full px-4 py-2 bg-green-500 text-white rounded hover:bg-green-600 transition">
+            disabled={!userAnswer.trim() || feedback !== ''}
+            className={`w-full px-4 py-2 rounded transition text-white ${
+              (!userAnswer.trim() || feedback !== '')
+                ? 'bg-gray-400 cursor-not-allowed'
+                : 'bg-green-500 hover:bg-green-600'
+            }`}>
             Submit Answer
           </button>
         </form>

@@ -1,5 +1,5 @@
 // src/screens/StartScreen.js
-import React, { useContext } from 'react';
+import { useContext } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { QuestionContext } from '../contexts/QuestionContext';
 
