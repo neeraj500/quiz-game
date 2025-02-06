@@ -1,5 +1,5 @@
 // src/screens/StartScreen.js
-import { useContext } from 'react';
+import React, { useContext } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { QuestionContext } from '../contexts/QuestionContext';
 
@@ -7,21 +7,24 @@ const StartScreen = () => {
   const navigate = useNavigate();
   const { resetGame } = useContext(QuestionContext);
 
-  // Start game: reset state and navigate to quiz screen
   const startGame = () => {
     resetGame();
     navigate('/quiz');
   };
 
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center bg-gray-100 p-4">
-      <h1 className="text-4xl font-bold mb-4">Welcome to the Quiz Game</h1>
-      <p className="mb-8">Test your knowledge and level up!</p>
-      <button 
-        onClick={startGame} 
-        className="px-6 py-3 bg-blue-500 text-white rounded hover:bg-blue-600 transition">
-        Start Quiz
-      </button>
+    <div className="min-h-screen bg-gradient-to-br from-slate-200 to-slate-50 flex flex-col items-center justify-center p-4">
+      <div className="bg-white rounded shadow-lg p-8 max-w-md w-full text-center">
+        <h1 className="text-4xl font-bold text-indigo-600 mb-4">Quiz Game</h1>
+        <p className="text-gray-700 mb-8">
+          Test your knowledge and level up with each correct answer!
+        </p>
+        <button 
+          onClick={startGame} 
+          className="px-6 py-3 bg-indigo-500 text-white rounded hover:bg-indigo-600 transition">
+          Start Quiz
+        </button>
+      </div>
     </div>
   );
 };
